@@ -114,17 +114,29 @@ static void *extend_heap(size_t words)
 }
 
 static void *find_fit(size_t asize)
-{
+{   
+    char *bestp = NULL;
+    size_t bests = (size_t)-1;
+
     for (char *bp = heap_listp; GET_SIZE(HDRP(bp)) != 0; bp = NEXT_BLKP(bp))
     {
         if (GET_ALLOC(HDRP(bp)) == 0 && asize <= GET_SIZE(HDRP(bp)))
         {
-            return bp;
+            if (asize == GET_SIZE(HDRP(bp)))
+            {
+                return bp;
+            }else
+            {
+                if (bests > GET_SIZE(HDRP(bp)))
+                {
+                    bests = GET_SIZE(HDRP(bp));
+                    bestp = bp;
+                }
+            }
         }
-
     }
 
-    return NULL;
+    return bestp;
 }
 
 static void *place(void *bp, size_t asize)
