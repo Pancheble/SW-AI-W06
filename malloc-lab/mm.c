@@ -34,14 +34,6 @@ team_t team = {
     /* Second member's email address (leave blank if none) */
     ""};
 
-/* single word (4) or double word (8) alignment */
-#define ALIGNMENT 8
-
-/* rounds up to the nearest multiple of ALIGNMENT */
-#define ALIGN(size) (((size) + (ALIGNMENT - 1)) & ~0x7)
-
-#define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
-
 /* Basic constants and macros */
 #define WSIZE               4
 #define DSIZE               8
@@ -135,6 +127,24 @@ static void *find_fit(size_t asize)
     return NULL;
 }
 
+static void *place(void *bp, size_t asize)
+{   
+    size_t csize = GET_SIZE(HDRP(bp));
+
+    if ((csize - asize) >= 2*DSIZE)
+    {
+        PUT(HDRP(bp), PACK(asize, 1));
+        PUT(FTRP(bp), PACK(asize, 1));
+
+        PUT(HDRP(NEXT_BLKP(bp)), PACK(csize - asize, 0));
+        PUT(FTRP(NEXT_BLKP(bp)), PACK(csize - asize, 0));
+    }else
+    {
+        PUT(HDRP(bp), PACK(csize, 1));
+        PUT(FTRP(bp), PACK(csize, 1));
+    }
+}
+
 /*
  * mm_init - initialize the malloc package.
  */
@@ -222,7 +232,7 @@ void *mm_realloc(void *ptr, size_t size)
     {
         return NULL;
     }
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+    copySize = GET_SIZE(HDRP(oldptr)) - DSIZE;
     if (size < copySize)
     {
         copySize = size;
