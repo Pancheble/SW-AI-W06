@@ -79,21 +79,18 @@ static void *coalesce(void *bp)
     if (prev_alloc && next_alloc)
     {
         return bp;
-    }
-    else if (prev_alloc && !next_alloc)
+    }else if (prev_alloc && !next_alloc)
     {
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
-    }
-    else if (!prev_alloc && next_alloc)
+    }else if (!prev_alloc && next_alloc)
     {
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
-        PUT(HDRP(bp), PACK(size, 0));
-        PUT(FTRP(PREV_BLKP(bp)), PACK(size, 0));
+        PUT(FTRP(bp), PACK(size, 0));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
-    }
-    else
+    }else
     {
         size += GET_SIZE(HDRP(NEXT_BLKP(bp))) + GET_SIZE(FTRP(PREV_BLKP(bp)));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
@@ -122,6 +119,20 @@ static void *extend_heap(size_t words)
 
     /* Coalesce if the previous block was free */
     return coalesce(bp);
+}
+
+static void *find_fit(size_t asize)
+{
+    for (char *bp = heap_listp; GET_SIZE(HDRP(bp)) != 0; bp = NEXT_BLKP(bp))
+    {
+        if (GET_ALLOC(HDRP(bp)) == 0 && asize <= GET_SIZE(HDRP(bp)))
+        {
+            return bp;
+        }
+
+    }
+
+    return NULL;
 }
 
 /*
@@ -153,17 +164,36 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-    int newsize = ALIGN(size + SIZE_T_SIZE);
-    void *p = mem_sbrk(newsize);
-    if (p == (void *)-1)
+    size_t asize;
+    size_t extendsize;
+    char *bp;
+
+    if (size == 0)
     {
         return NULL;
     }
-    else
+
+    if (size <= DSIZE)
     {
-        *(size_t *)p = size;
-        return (void *)((char *)p + SIZE_T_SIZE);
+        asize = 2*DSIZE;
+    }else
+    {
+        asize = DSIZE * ((size + DSIZE + (DSIZE-1)) / DSIZE);
     }
+
+    if ((bp = find_fit(asize)) != NULL)
+    {
+        place(bp, asize);
+        return bp;
+    }
+
+    extendsize = MAX(asize, CHUNKSIZE);
+    if ((bp = extend_heap(extendsize / WSIZE)) == NULL)
+    {
+        return NULL;
+    }
+    place(bp, asize);
+    return bp;
 }
 
 /*
