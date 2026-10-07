@@ -69,6 +69,18 @@ team_t team = {
 static char *heap_listp;
 static char *free_headp;
 
+static void *coalesce(void *bp);
+static void *extend_heap(size_t words);
+static void *find_fit(size_t asize);
+static void *place(void *bp, size_t asize);
+static void *insert_free(void *bp);
+static void *remove_free(void *bp);
+
+int mm_init(void);
+void *mm_malloc(size_t size);
+void mm_free(void *ptr);
+void *mm_realloc(void *ptr, size_t size);
+
 static void *coalesce(void *bp)
 {
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
@@ -77,24 +89,38 @@ static void *coalesce(void *bp)
 
     if (prev_alloc && next_alloc)
     {
+        insert_free(bp);
         return bp;
     }else if (prev_alloc && !next_alloc)
     {
+        remove_free(NEXT_BLKP(bp));
+        
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
+
+        insert_free(bp);
     }else if (!prev_alloc && next_alloc)
-    {
+    {   
+        remove_free(PREV_BLKP(bp));
+
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
         PUT(FTRP(bp), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
+
+        insert_free(bp);
     }else
-    {
+    {   
+        remove_free(NEXT_BLKP(bp));
+        remove_free(PREV_BLKP(bp));
+
         size += GET_SIZE(HDRP(NEXT_BLKP(bp))) + GET_SIZE(FTRP(PREV_BLKP(bp)));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
+
+        insert_free(bp);
     }
     return bp;
 }
@@ -125,9 +151,9 @@ static void *find_fit(size_t asize)
     char *bestp = NULL;
     size_t bests = (size_t)-1;
 
-    for (char *bp = heap_listp; GET_SIZE(HDRP(bp)) != 0; bp = NEXT_BLKP(bp))
+    for (char *bp = free_headp; bp != NULL; bp = GETP_NEXT(bp))
     {
-        if (GET_ALLOC(HDRP(bp)) == 0 && asize <= GET_SIZE(HDRP(bp)))
+        if (asize <= GET_SIZE(HDRP(bp)))
         {
             if (asize == GET_SIZE(HDRP(bp)))
             {
@@ -148,6 +174,8 @@ static void *find_fit(size_t asize)
 
 static void *place(void *bp, size_t asize)
 {   
+    remove_free(bp);
+
     size_t csize = GET_SIZE(HDRP(bp));
 
     if ((csize - asize) >= 2*DSIZE)
@@ -157,6 +185,8 @@ static void *place(void *bp, size_t asize)
 
         PUT(HDRP(NEXT_BLKP(bp)), PACK(csize - asize, 0));
         PUT(FTRP(NEXT_BLKP(bp)), PACK(csize - asize, 0));
+
+        insert_free(NEXT_BLKP(bp));
     }else
     {
         PUT(HDRP(bp), PACK(csize, 1));
