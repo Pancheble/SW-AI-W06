@@ -60,7 +60,14 @@ team_t team = {
 #define NEXT_BLKP(bp)       ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
 #define PREV_BLKP(bp)       ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
+#define PUTP_NEXT(bp, p)    (PUT(bp, (p) == NULL? 0 : (unsigned int)((char *)(p) - (char *)(mem_heap_lo()))))
+#define GETP_NEXT(bp)       (GET(bp) == 0? NULL : (char *)(mem_heap_lo()) + GET(bp))
+
+#define PUTP_PREV(bp, p)    (PUT((char *)(bp)+WSIZE, (p) == NULL? 0 : (unsigned int)((char *)(p) - (char *)(mem_heap_lo()))))
+#define GETP_PREV(bp)       (GET((char *)(bp)+WSIZE) == 0? NULL : (char *)(mem_heap_lo()) + GET((char *)(bp)+WSIZE))
+
 static char *heap_listp;
+static char *free_headp;
 
 static void *coalesce(void *bp)
 {
@@ -155,6 +162,35 @@ static void *place(void *bp, size_t asize)
         PUT(HDRP(bp), PACK(csize, 1));
         PUT(FTRP(bp), PACK(csize, 1));
     }
+}
+
+static void *insert_free(void *bp)
+{
+    /*
+    
+    --free01--
+    next - null
+    prev - null
+    ----------
+
+    head = free01
+
+    --free02--
+    next - head (free01)
+    prev - null
+    ----------
+
+    next = head
+    head = free02 #update
+    next.prev = head
+
+    */
+   
+}
+
+static void *remove_free(void *bp)
+{
+
 }
 
 /*
