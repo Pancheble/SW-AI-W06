@@ -166,31 +166,34 @@ static void *place(void *bp, size_t asize)
 
 static void *insert_free(void *bp)
 {
-    /*
-    
-    --free01--
-    next - null
-    prev - null
-    ----------
+    PUTP_NEXT(bp, free_headp);
+    PUTP_PREV(bp, NULL);
 
-    head = free01
+    if (free_headp != NULL)
+    {
+        PUTP_PREV(free_headp, bp);
+    }
 
-    --free02--
-    next - head (free01)
-    prev - null
-    ----------
-
-    next = head
-    head = free02 #update
-    next.prev = head
-
-    */
-   
+    free_headp = bp;
 }
 
 static void *remove_free(void *bp)
 {
-
+    if (GETP_NEXT(bp) == NULL && GETP_PREV(bp) == NULL)
+    {
+        free_headp = NULL;
+    }else if (GETP_PREV(bp) == NULL)
+    {
+        PUTP_PREV(GETP_NEXT(bp), NULL);
+        free_headp = GETP_NEXT(bp);
+    }else if (GETP_NEXT(bp) == NULL)
+    {
+        PUTP_NEXT(GETP_PREV(bp), NULL);
+    }else
+    {
+        PUTP_PREV(GETP_NEXT(bp), GETP_PREV(bp));
+        PUTP_NEXT(GETP_PREV(bp), GETP_NEXT(bp));
+    }
 }
 
 /*
@@ -208,6 +211,7 @@ int mm_init(void)
     PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1));
     PUT(heap_listp + (3*WSIZE), PACK(0, 1));
     heap_listp += (2*WSIZE);
+    free_headp = NULL;
 
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL)
     {
